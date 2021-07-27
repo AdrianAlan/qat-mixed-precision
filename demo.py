@@ -1,11 +1,16 @@
 # Based on: kuangliu/pytorch-cifar
 
+import os
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
+import sys
+
+from tqdm import trange
 
 
 class AverageMeter(object):
@@ -151,3 +156,79 @@ net = ResNet18().to(device)
 if device == 'cuda':
     net = torch.nn.DataParallel(net)
     cudnn.benchmark = True
+
+# Training
+criterion = nn.CrossEntropyLoss().cuda()
+optimizer = optim.SGD(net.parameters(),
+                      lr=0.01,
+                      momentum=0.9,
+                      weight_decay=5e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+
+
+def run_epoch(epoch, net, loader, prefix='Training', backprop=True):
+    tr = trange(len(loader), file=sys.stdout)
+    loss = AverageMeter('Loss', ':1.5f')
+    accuracy = AverageMeter('Accuracy', ':1.5f')
+    loss.reset()
+    accuracy.reset()
+    for (inputs, targets) in loader:
+        inputs, targets = inputs.to(device), targets.to(device)
+        optimizer.zero_grad()
+        outputs = net(inputs)
+        batch_loss = criterion(outputs, targets)
+        if backprop:
+            batch_loss.backward()
+            optimizer.step()
+        loss.update(batch_loss.item(), targets.size(0))
+        _, predicted = outputs.max(1)
+        accuracy.update(predicted.eq(targets).sum().item()/targets.size(0),
+                        targets.size(0))
+        tr.set_description('{0} epoch {1}: {2}, {3}'.format(
+            prefix, epoch, loss, accuracy))
+        tr.update(1)
+    tr.close()
+    return loss.avg, accuracy.avg,
+
+
+def run(epoch, train=True):
+    if train:
+        net.train()
+        loss, accuracy = run_epoch(epoch, net, train_loader)
+    else:
+        net.eval()
+        with torch.no_grad():
+            loss, accuracy = run_epoch(epoch,
+                                       net,
+                                       test_loader,
+                                       prefix='Test',
+                                       backprop=False)
+    return loss, accuracy
+
+
+train_accuracy, test_accuracy = [], []
+train_loss, test_loss = [], []
+
+best_accuracy = 0
+
+for epoch in range(1, 20):
+
+    loss, accuracy = run(epoch, train=True)
+    train_loss.append(accuracy)
+    train_accuracy.append(accuracy)
+
+    loss, accuracy = run(epoch, train=False)
+    test_loss.append(loss)
+    test_accuracy.append(loss)
+
+    if accuracy > best_accuracy:
+        state = {
+            'accuracy': accuracy,
+            'epoch': epoch,
+            'net': net.state_dict()
+        }
+        if not os.path.isdir('models'):
+            os.mkdir('models')
+        torch.save(net.state_dict(), './models/checkpoint.pth')
+        best_accuracy = accuracy
+    scheduler.step()
