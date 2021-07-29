@@ -1,5 +1,6 @@
 # Based on: kuangliu/pytorch-cifar
 
+import matplotlib.pyplot as plt
 import os
 import torch
 import torch.backends.cudnn as cudnn
@@ -214,12 +215,12 @@ best_accuracy = 0
 for epoch in range(1, 20):
 
     loss, accuracy = run(epoch, train=True)
-    train_loss.append(accuracy)
+    train_loss.append(loss)
     train_accuracy.append(accuracy)
 
     loss, accuracy = run(epoch, train=False)
     test_loss.append(loss)
-    test_accuracy.append(loss)
+    test_accuracy.append(accuracy)
 
     if accuracy > best_accuracy:
         state = {
@@ -232,3 +233,18 @@ for epoch in range(1, 20):
         torch.save(net.state_dict(), './models/checkpoint.pth')
         best_accuracy = accuracy
     scheduler.step()
+
+# Plot training
+fig, axs = plt.subplots(2, 2, figsize=(25, 20))
+
+axs[0, 0].set_title('Train Loss')
+axs[0, 1].set_title('Training Accuracy')
+axs[1, 0].set_title('Test Loss')
+axs[1, 1].set_title('Test Accuracy')
+
+axs[0, 0].plot(train_loss)
+axs[0, 1].plot(train_accuracy)
+axs[1, 0].plot(test_loss)
+axs[1, 1].plot(test_accuracy)
+
+fig.savefig("plots/results.png")
