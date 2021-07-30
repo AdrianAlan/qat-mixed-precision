@@ -167,7 +167,12 @@ optimizer = optim.SGD(net.parameters(),
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 
-def run_epoch(epoch, net, loader, prefix='Training', backprop=True):
+def run_epoch(epoch,
+              net,
+              loader,
+              prefix='Training',
+              backprop=True,
+              fp16=False):
     tr = trange(len(loader), file=sys.stdout)
     loss = AverageMeter('Loss', ':1.5f')
     accuracy = AverageMeter('Accuracy', ':1.5f')
@@ -175,6 +180,8 @@ def run_epoch(epoch, net, loader, prefix='Training', backprop=True):
     accuracy.reset()
     for (inputs, targets) in loader:
         inputs, targets = inputs.to(device), targets.to(device)
+        if fp16:
+            inputs = inputs.half()
         optimizer.zero_grad()
         outputs = net(inputs)
         batch_loss = criterion(outputs, targets)
@@ -192,33 +199,40 @@ def run_epoch(epoch, net, loader, prefix='Training', backprop=True):
     return loss.avg, accuracy.avg,
 
 
-def run(epoch, train=True):
+def run(epoch, train=True, fp16=False):
     if train:
+        if fp16:
+            net.float()
         net.train()
         loss, accuracy = run_epoch(epoch, net, train_loader)
     else:
         net.eval()
+        if fp16:
+            net.half()
         with torch.no_grad():
             loss, accuracy = run_epoch(epoch,
                                        net,
                                        test_loader,
                                        prefix='Test',
-                                       backprop=False)
+                                       backprop=False,
+                                       fp16=fp16)
     return loss, accuracy
 
 
 train_accuracy, test_accuracy = [], []
 train_loss, test_loss = [], []
 
+fp16 = True
+
 best_accuracy = 0
 
 for epoch in range(1, 20):
 
-    loss, accuracy = run(epoch, train=True)
+    loss, accuracy = run(epoch, train=True, fp16=fp16)
     train_loss.append(loss)
     train_accuracy.append(accuracy)
 
-    loss, accuracy = run(epoch, train=False)
+    loss, accuracy = run(epoch, train=False, fp16=fp16)
     test_loss.append(loss)
     test_accuracy.append(accuracy)
 
