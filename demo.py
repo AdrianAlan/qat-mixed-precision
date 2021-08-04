@@ -1,6 +1,5 @@
 # Based on: kuangliu/pytorch-cifar
 
-import matplotlib.pyplot as plt
 import os
 import torch
 import torch.backends.cudnn as cudnn
@@ -12,7 +11,7 @@ import torchvision.transforms as transforms
 import sys
 
 from models import ResNet18
-from utils import AverageMeter
+from utils import AverageMeter, Plotting
 from tqdm import trange
 
 
@@ -152,17 +151,5 @@ for epoch in range(1, 20):
         best_accuracy = accuracy
     scheduler.step()
 
-# Plot training
-fig, axs = plt.subplots(2, 2, figsize=(25, 20))
-
-axs[0, 0].set_title('Train Loss')
-axs[0, 1].set_title('Training Accuracy')
-axs[1, 0].set_title('Test Loss')
-axs[1, 1].set_title('Test Accuracy')
-
-axs[0, 0].plot(train_loss)
-axs[0, 1].plot(train_accuracy)
-axs[1, 0].plot(test_loss)
-axs[1, 1].plot(test_accuracy)
-
-fig.savefig("plots/results.png")
+plot = Plotting('plots/results.png')
+plot.draw(train_loss, train_accuracy, test_loss, test_accuracy)
