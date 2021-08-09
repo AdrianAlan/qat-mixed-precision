@@ -10,6 +10,7 @@ import torchvision
 import torchvision.transforms as transforms
 import sys
 
+from ailabs_qat.model.retrainer import QatRetrainerModel
 from models import ResNet18
 from utils import AverageMeter, Plotting
 from tqdm import trange
@@ -136,6 +137,9 @@ if __name__ == '__main__':
     parser.add_argument('--fp16',
                         action="store_true",
                         help='Inference in half precision')
+    parser.add_argument('--qat',
+                        action="store_true",
+                        help='Quantization aware training')
     parser.add_argument('-v', '--verbose',
                         action="store_true",
                         help='Output verbosity')
@@ -153,7 +157,11 @@ if __name__ == '__main__':
 
     # Prepare the ResNet18 model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    net = ResNet18().to(device)
+    net = ResNet18()
+    if args.qat:
+        net = QatRetrainerModel(net, qat_config='qat_config.yaml')
+
+    net.to(device)
     if device == 'cuda':
         cudnn.benchmark = True
         net = torch.nn.DataParallel(net)
