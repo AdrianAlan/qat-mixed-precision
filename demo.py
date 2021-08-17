@@ -17,6 +17,9 @@ from tqdm import trange
 
 
 def get_cifar10_loaders(train_batch_size=25, test_batch_size=100):
+    import ssl
+
+    ssl._create_default_https_context = ssl._create_unverified_context
 
     train_loader = torch.utils.data.DataLoader(
         torchvision.datasets.CIFAR10(
@@ -66,7 +69,8 @@ def run_epoch(epoch,
         inputs, targets = inputs.to(device), targets.to(device)
         if fp16:
             inputs = inputs.half()
-        optimizer.zero_grad()
+        if backprop:
+            optimizer.zero_grad()
         outputs = net(inputs)
         batch_loss = criterion(outputs, targets)
         if backprop:
@@ -112,7 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('-b',
                         type=int,
                         help='Training batch size',
-                        default=25,
+                        default=256,
                         dest='batch_size')
     parser.add_argument('-e',
                         type=int,
@@ -143,6 +147,9 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--verbose',
                         action="store_true",
                         help='Output verbosity')
+    parser.add_argument('--qonnx',
+                        action="store_true",
+                        help='Export Qat to onnx')
 
     args = parser.parse_args()
 
@@ -158,16 +165,37 @@ if __name__ == '__main__':
     # Prepare the ResNet18 model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     net = ResNet18()
-    if args.qat:
-        net = QatRetrainerModel(net, qat_config='qat_config.yaml')
-
+    net = torch.nn.DataParallel(net)
+    net.load_state_dict(torch.load("models/float_best.pth"))
     net.to(device)
+
+    criterion = nn.CrossEntropyLoss().to(device)
+
+    #print("Float accuracy: ")
+    #loss, accuracy = run(0, test_loader, train=False, fp16=args.fp16)
+    net = net.module
+    if args.qat:
+        net = QatRetrainerModel(net, qat_config='/home/olyas/ailabs/ailabs_qat/config/config.yaml')
+        net.set_weights_bits(4)
+        net.set_data_bits(4)
+        net.set_lock_activation_quantization(False)
+        net.set_data_quant(True)
+        net.set_weights_quant(True)
+        net.to(device)
+    if args.qonnx:
+        dummy = torch.rand((1,3,30,30)).cuda()
+        net(dummy)
+        net.export_to_onnx(dummy, 'models/4bit_model.onnx')
+    #net.print_configurable_layers_id() # print layers names for configuration
+    print("8 bit accuracy: ")
+    loss, accuracy = run(0, test_loader, train=False, fp16=args.fp16)
+
     if device == 'cuda':
         cudnn.benchmark = True
         net = torch.nn.DataParallel(net)
 
     # Training
-    criterion = nn.CrossEntropyLoss().to(device)
+
     optimizer = optim.SGD(net.parameters(),
                           lr=args.learning_rate,
                           momentum=args.momentum,
