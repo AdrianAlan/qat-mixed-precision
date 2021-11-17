@@ -212,6 +212,10 @@ if __name__ == '__main__':
     best_accuracy = 0
 
     for epoch in range(1, args.epochs+1):
+        if epoch == 2:
+            dummy = torch.rand((1, 3, 30, 30)).cuda()
+            net.module.export_to_onnx(dummy, 'models/dynamic_bit_model.onnx')
+            print("done export to onnx")
 
         loss, accuracy = run(epoch, train_loader, train=True, fp16=args.fp16)
         train_loss.append(loss)

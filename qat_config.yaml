@@ -1,5 +1,5 @@
 ---
-input-size :  [3, 224, 224]
+
 skip-first-conv-quantization: Off
 data-quantization:
   status: On
@@ -24,4 +24,3 @@ weights-quantization:
   bits: 8
   layers-to-ignore : []
   custom-bits:  {'conv1.model': 16, 'layer1.0.conv1.model': 16, 'layer1.0.conv2.model': 16, 'layer1.1.conv1.model': 16, 'layer1.1.conv2.model': 16, 'layer2.0.conv1.model': 16, 'layer2.0.conv2.model': 16, 'layer2.1.conv1.model': 8, 'layer2.1.conv2.model': 8, 'layer3.0.conv1.model': 8, 'layer3.0.conv2.model': 8, 'layer3.1.conv1.model': 8, 'layer3.1.conv2.model': 8, 'layer4.0.conv1.model': 4, 'layer4.0.conv2.model': 4, 'layer4.1.conv1.model': 4, 'layer4.1.conv2.model': 2, 'linear.model': 16}
-  skip-first-conv-quantization: False
