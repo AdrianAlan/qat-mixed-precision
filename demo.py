@@ -9,14 +9,14 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 import sys
-
+sys.path.append(r"/home/olyas/ailabs")
 from ailabs_qat.model.retrainer import QatRetrainerModel
 from models import ResNet18
 from utils import AverageMeter, Plotting
 from tqdm import trange
 
 
-def get_cifar10_loaders(train_batch_size=25, test_batch_size=100):
+def get_cifar10_loaders(train_batch_size=256, test_batch_size=512):
     import ssl
 
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -84,6 +84,7 @@ def run_epoch(epoch,
             prefix, epoch, loss, accuracy))
         tr.update(1)
     tr.close()
+    print("accuracy: {}".format(accuracy.average))
     return loss.average, accuracy.average
 
 
@@ -175,12 +176,9 @@ if __name__ == '__main__':
     #loss, accuracy = run(0, test_loader, train=False, fp16=args.fp16)
     net = net.module
     if args.qat:
-        net = QatRetrainerModel(net, qat_config='/home/olyas/ailabs/ailabs_qat/config/config.yaml')
-        net.set_weights_bits(4)
-        net.set_data_bits(4)
+        net = QatRetrainerModel(net, qat_config='qat_config.yaml')
+        net.print_configurable_layers_id()
         net.set_lock_activation_quantization(False)
-        net.set_data_quant(True)
-        net.set_weights_quant(True)
         net.to(device)
     if args.qonnx:
         dummy = torch.rand((1,3,30,30)).cuda()
@@ -196,7 +194,13 @@ if __name__ == '__main__':
 
     # Training
 
-    optimizer = optim.SGD(net.parameters(),
+    params_sc = [p for n, p in net.named_parameters() if n.endswith("_sc")]
+    params_other = [p for n, p in net.named_parameters() if not n.endswith("_sc")]
+
+
+
+    optimizer = optim.SGD([{'params': params_other},
+                                 {'params': params_sc, 'lr': args.learning_rate / 100.}],
                           lr=args.learning_rate,
                           momentum=args.momentum,
                           weight_decay=args.weight_decay)
